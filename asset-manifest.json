@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/meeting-planner/static/css/main.3b405ae8.css",
+    "main.js": "/meeting-planner/static/js/main.42163ead.js",
+    "static/js/453.0e86525b.chunk.js": "/meeting-planner/static/js/453.0e86525b.chunk.js",
+    "index.html": "/meeting-planner/index.html",
+    "main.3b405ae8.css.map": "/meeting-planner/static/css/main.3b405ae8.css.map",
+    "main.42163ead.js.map": "/meeting-planner/static/js/main.42163ead.js.map",
+    "453.0e86525b.chunk.js.map": "/meeting-planner/static/js/453.0e86525b.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.3b405ae8.css",
+    "static/js/main.42163ead.js"
+  ]
+}
