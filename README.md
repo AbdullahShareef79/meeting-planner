@@ -46,9 +46,10 @@ npm install
 ```
 MONGODB_URI=your_mongodb_connection_string
 PORT=5000
+CORS_ORIGIN=http://localhost:3000
 ```
 
-## Running the Application
+## Running the Application (Development)
 
 1. Start the backend server:
 ```bash
@@ -62,6 +63,69 @@ npm start
 ```
 
 The application will be available at `http://localhost:3000`
+
+## Deployment Guide
+
+### Backend Deployment
+
+1. Requirements:
+   - Node.js hosting environment (e.g., Heroku, DigitalOcean, AWS)
+   - MongoDB production database (e.g., MongoDB Atlas)
+   - SSL certificate for HTTPS (recommended)
+
+2. Environment Variables for Production:
+```
+MONGODB_URI=your_production_mongodb_uri
+PORT=your_production_port
+CORS_ORIGIN=https://your-frontend-domain.com
+NODE_ENV=production
+```
+
+3. Production Setup Steps:
+   - Set up MongoDB Atlas cluster or equivalent production database
+   - Configure production environment variables
+   - Set up reverse proxy (e.g., Nginx) if needed
+   - Enable HTTPS
+   - Configure server firewall rules
+
+### Frontend Deployment
+
+1. Update Production API URL:
+   - Before building, ensure the API URL points to your production backend
+   - Update `REACT_APP_API_URL` in frontend `.env`:
+```
+REACT_APP_API_URL=https://your-api-domain.com
+```
+
+2. Build and Deploy:
+```bash
+cd client
+npm run build
+```
+
+3. The project includes GitHub Pages configuration:
+```bash
+npm run deploy
+```
+
+### Security Considerations
+
+1. Environment Variables:
+   - Never commit `.env` files
+   - Use environment variable management in production
+   - Rotate sensitive credentials periodically
+
+2. API Security:
+   - Enable CORS with specific origins
+   - Use HTTPS in production
+   - Implement rate limiting
+   - Add request validation
+
+3. Database Security:
+   - Use strong MongoDB user credentials
+   - Enable MongoDB authentication
+   - Configure IP whitelist
+   - Regular backup strategy
 
 ## Features in Detail
 
