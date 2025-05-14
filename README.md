@@ -1,70 +1,98 @@
-# Getting Started with Create React App
+# Meeting Planner
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern web application for efficiently scheduling team meetings by finding the best overlapping time slots based on team members' availability.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 📅 Schedule meetings with 30-minute time slot precision
+- 👥 Manage team members and their availability
+- 🔍 Automatically find the best meeting times based on team availability
+- 🔗 Share meeting plans with team members
+- 💾 Persistent data storage with MongoDB
+- 🎨 Modern and responsive user interface
 
-### `npm start`
+## Tech Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **Frontend**: React.js with TypeScript
+- **Backend**: Node.js with Express
+- **Database**: MongoDB
+- **Styling**: Tailwind CSS
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Prerequisites
 
-### `npm test`
+- Node.js (v14 or higher)
+- MongoDB
+- npm or yarn
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Installation
 
-### `npm run build`
+1. Clone the repository:
+```bash
+git clone https://github.com/AbdullahShareef79/meeting-planner.git
+cd meeting-planner
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+2. Install dependencies:
+```bash
+# Install backend dependencies
+npm install
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Install frontend dependencies
+cd client
+npm install
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+3. Create a `.env` file in the root directory with the following variables:
+```
+MONGODB_URI=your_mongodb_connection_string
+PORT=5000
+```
 
-### `npm run eject`
+## Running the Application
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. Start the backend server:
+```bash
+npm run server
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+2. In a separate terminal, start the frontend development server:
+```bash
+cd client
+npm start
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The application will be available at `http://localhost:3000`
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Features in Detail
 
-## Learn More
+### Meeting Management
+- Create, edit, and delete meetings
+- Set meeting duration and participant list
+- View all scheduled meetings
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Team Member Management
+- Add and remove team members
+- Set individual availability schedules
+- Update team member information
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Time Slot Management
+- 30-minute precision time slots
+- Automatic best time calculation
+- Visual conflict detection
 
-### Code Splitting
+### Sharing Functionality
+- Generate shareable links
+- Collaborative meeting planning
+- Real-time updates
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Contributing
 
-### Analyzing the Bundle Size
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## License
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project is licensed under the MIT License - see the LICENSE file for details.
