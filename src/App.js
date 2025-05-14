@@ -1,11 +1,14 @@
-import React from "react";
-import MeetingPlanner from "./MeetingPlanner";
+import React from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
+import MeetingPlanner from './MeetingPlanner';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <MeetingPlanner />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-100">
+        <MeetingPlanner />
+      </div>
+    </ErrorBoundary>
   );
 }
 

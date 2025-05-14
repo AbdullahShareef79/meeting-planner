@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from "react";
+import { meetingService } from './services/meetingService.js';
+import { teamMemberService } from './services/teamMemberService.js';
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const hours = Array.from({ length: 12 }, (_, i) => `${8 + i}:00`); // 8:00 to 19:00
+// Generate time slots from 8:00 to 20:00 with 30-minute intervals
+const timeSlots = Array.from({ length: 25 }, (_, i) => {
+  const hour = Math.floor(i / 2) + 8;
+  const minutes = i % 2 === 0 ? "00" : "30";
+  return `${hour.toString().padStart(2, '0')}:${minutes}`;
+});
+
+// Helper function to format time for display
+const formatTimeDisplay = (time) => {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
 
 const AdvancedMeetingPlanner = () => {
-  const [teamMembers, setTeamMembers] = useState([
-    { id: 1, name: "Alex Smith", availability: {} },
-    { id: 2, name: "Jamie Johnson", availability: {} }
-  ]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [newMemberName, setNewMemberName] = useState("");
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editMemberName, setEditMemberName] = useState("");
@@ -26,6 +39,17 @@ const AdvancedMeetingPlanner = () => {
   
   const [activeTab, setActiveTab] = useState("availability"); // "availability" or "events"
   const [activeEvent, setActiveEvent] = useState(null);
+  
+  const [meetings, setMeetings] = useState([]);
+  const [formData, setFormData] = useState({
+    title: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    description: '',
+    participants: '',
+  });
+  const [error, setError] = useState('');
   
   // Generate date range when dates change
   useEffect(() => {
@@ -47,7 +71,7 @@ const AdvancedMeetingPlanner = () => {
       dates.forEach(date => {
         const dateStr = date.toISOString().split('T')[0];
         if (!availability[dateStr]) {
-          availability[dateStr] = Array(hours.length).fill(false);
+          availability[dateStr] = Array(timeSlots.length).fill(false);
         }
       });
       return { ...member, availability };
@@ -56,26 +80,59 @@ const AdvancedMeetingPlanner = () => {
     setTeamMembers(updatedMembers);
   }, [selectedPeriod]);
 
+  useEffect(() => {
+    loadMeetings();
+    loadTeamMembers();
+  }, []);
+
+  const loadMeetings = async () => {
+    try {
+      const data = await meetingService.getAllMeetings();
+      setMeetings(data);
+    } catch (err) {
+      setError('Failed to load meetings');
+      console.error(err);
+    }
+  };
+
+  const loadTeamMembers = async () => {
+    try {
+      const data = await teamMemberService.getAllTeamMembers();
+      setTeamMembers(data);
+    } catch (err) {
+      setError('Failed to load team members');
+      console.error(err);
+    }
+  };
+
   const handleEditMember = (memberId) => {
-    const member = teamMembers.find(m => m.id === memberId);
+    const member = teamMembers.find(m => m._id === memberId);
     if (member) {
-      setEditingMemberId(memberId);
+      setEditingMemberId(member._id);
       setEditMemberName(member.name);
     }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editMemberName.trim()) {
-      setTeamMembers(prev => {
-        return prev.map(member => {
-          if (member.id === editingMemberId) {
-            return { ...member, name: editMemberName.trim() };
-          }
-          return member;
+      try {
+        const member = teamMembers.find(m => m._id === editingMemberId);
+        if (!member) return;
+
+        const updatedMember = await teamMemberService.updateTeamMember(editingMemberId, {
+          name: editMemberName.trim()
         });
-      });
-      setEditingMemberId(null);
-      setEditMemberName("");
+
+        setTeamMembers(prev => prev.map(m => 
+          m._id === editingMemberId ? updatedMember : m
+        ));
+        
+        setEditingMemberId(null);
+        setEditMemberName("");
+      } catch (err) {
+        setError('Failed to update team member');
+        console.error(err);
+      }
     }
   };
 
@@ -84,77 +141,155 @@ const AdvancedMeetingPlanner = () => {
     setEditMemberName("");
   };
 
-  const handleAddMember = () => {
+  const handleAddMember = async () => {
     if (newMemberName.trim()) {
-      const newMember = {
-        id: teamMembers.length + 1,
-        name: newMemberName,
-        availability: {}
-      };
-      
-      // Initialize availability for the new member
-      dateRange.forEach(date => {
-        const dateStr = date.toISOString().split('T')[0];
-        newMember.availability[dateStr] = Array(hours.length).fill(false);
-      });
-      
-      setTeamMembers([...teamMembers, newMember]);
-      setNewMemberName("");
+      try {
+        const newMember = {
+          name: newMemberName,
+          availability: {}
+        };
+        
+        // Initialize availability for the new member
+        dateRange.forEach(date => {
+          const dateStr = date.toISOString().split('T')[0];
+          newMember.availability[dateStr] = Array(timeSlots.length).fill(false);
+        });
+        
+        const savedMember = await teamMemberService.createTeamMember(newMember);
+        setTeamMembers(prev => [...prev, savedMember]);
+        setNewMemberName("");
+      } catch (err) {
+        setError('Failed to create team member');
+        console.error(err);
+      }
     }
   };
 
-  const toggleAvailability = (memberId, dateStr, hourIndex) => {
-    setTeamMembers(prev => {
-      return prev.map(member => {
-        if (member.id === memberId) {
-          const newAvailability = { ...member.availability };
-          newAvailability[dateStr] = [...newAvailability[dateStr]];
-          newAvailability[dateStr][hourIndex] = !newAvailability[dateStr][hourIndex];
-          return { ...member, availability: newAvailability };
-        }
-        return member;
-      });
-    });
+  const toggleAvailability = async (memberId, dateStr, timeSlot) => {
+    try {
+      const member = teamMembers.find(m => m._id === memberId);
+      if (!member) {
+        console.error('Member not found:', memberId);
+        return;
+      }
+
+      const newAvailability = { ...member.availability };
+      if (!newAvailability[dateStr] || !Array.isArray(newAvailability[dateStr])) {
+        newAvailability[dateStr] = Array(timeSlots.length).fill(false);
+      }
+
+      const timeIndex = timeSlots.indexOf(timeSlot);
+      if (timeIndex === -1) {
+        console.error('Invalid time slot:', timeSlot);
+        return;
+      }
+
+      newAvailability[dateStr] = [...newAvailability[dateStr]];
+      newAvailability[dateStr][timeIndex] = !newAvailability[dateStr][timeIndex];
+
+      const updatedMember = await teamMemberService.updateAvailability(memberId, newAvailability);
+      
+      setTeamMembers(prev => prev.map(m => 
+        m._id === memberId ? { ...m, availability: updatedMember.availability } : m
+      ));
+    } catch (err) {
+      setError(`Failed to update availability: ${err.message}`);
+      console.error('Error updating availability:', err);
+    }
+  };
+
+  const getAvailableTimeSlots = (member, dateStr) => {
+    if (!member.availability || !member.availability[dateStr]) return [];
+    return timeSlots.filter((_, index) => member.availability[dateStr][index]);
   };
 
   const getOverlap = () => {
     const overlap = {};
     
-    dateRange.forEach(date => {
-      const dateStr = date.toISOString().split('T')[0];
-      overlap[dateStr] = Array(hours.length).fill(true);
-      
-      hours.forEach((_, hourIndex) => {
-        teamMembers.forEach(member => {
-          if (!member.availability[dateStr] || !member.availability[dateStr][hourIndex]) {
-            overlap[dateStr][hourIndex] = false;
-          }
+    if (teamMembers.length === 0) {
+      console.log('No team members to calculate overlap');
+      return overlap;
+    }
+
+    try {
+      dateRange.forEach(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        overlap[dateStr] = Array(timeSlots.length).fill(true);
+        
+        timeSlots.forEach((_, timeIndex) => {
+          const membersAvailable = teamMembers.filter(member => {
+            return member.availability?.[dateStr]?.[timeIndex] === true;
+          });
+
+          overlap[dateStr][timeIndex] = membersAvailable.length === teamMembers.length;
         });
       });
-    });
-    
-    return overlap;
+
+      console.log('Calculated overlap:', overlap);
+      return overlap;
+    } catch (error) {
+      console.error('Error calculating overlap:', error);
+      return {};
+    }
   };
 
   const getBestMeetingTimes = () => {
-    const overlap = getOverlap();
-    const bestTimes = [];
-    
-    dateRange.forEach(date => {
-      const dateStr = date.toISOString().split('T')[0];
+    try {
+      const overlap = getOverlap();
+      const bestTimes = [];
       
-      hours.forEach((hour, hourIndex) => {
-        if (overlap[dateStr] && overlap[dateStr][hourIndex]) {
+      dateRange.forEach(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        if (!overlap[dateStr]) return;
+
+        let currentStreak = [];
+        
+        timeSlots.forEach((time, index) => {
+          if (overlap[dateStr][index]) {
+            currentStreak.push({ time, index });
+          } else if (currentStreak.length > 0) {
+            if (currentStreak.length >= 2) { // At least 1 hour (2 x 30-min slots)
+              bestTimes.push({
+                date: dateStr,
+                startTime: currentStreak[0].time,
+                endTime: timeSlots[currentStreak[currentStreak.length - 1].index],
+                duration: currentStreak.length * 30,
+                startIndex: currentStreak[0].index,
+                endIndex: currentStreak[currentStreak.length - 1].index
+              });
+            }
+            currentStreak = [];
+          }
+        });
+
+        // Check the last streak
+        if (currentStreak.length >= 2) {
           bestTimes.push({
             date: dateStr,
-            hour,
-            hourIndex
+            startTime: currentStreak[0].time,
+            endTime: timeSlots[currentStreak[currentStreak.length - 1].index],
+            duration: currentStreak.length * 30,
+            startIndex: currentStreak[0].index,
+            endIndex: currentStreak[currentStreak.length - 1].index
           });
         }
       });
-    });
-    
-    return bestTimes.slice(0, 5); // Top 5 options
+
+      // Sort by date and then by duration (prefer longer slots)
+      const sortedTimes = bestTimes
+        .sort((a, b) => {
+          const dateCompare = new Date(a.date) - new Date(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          return b.duration - a.duration;
+        })
+        .slice(0, 5); // Top 5 options
+
+      console.log('Calculated best meeting times:', sortedTimes);
+      return sortedTimes;
+    } catch (error) {
+      console.error('Error calculating best meeting times:', error);
+      return [];
+    }
   };
 
   const handleCreateEvent = () => {
@@ -168,7 +303,7 @@ const AdvancedMeetingPlanner = () => {
       
       // Initialize votes structure
       teamMembers.forEach(member => {
-        event.votes[member.id] = newEvent.dates.reduce((acc, date) => {
+        event.votes[member._id] = newEvent.dates.reduce((acc, date) => {
           acc[date] = false;
           return acc;
         }, {});
@@ -255,6 +390,259 @@ const AdvancedMeetingPlanner = () => {
   const overlap = getOverlap();
   const bestMeetingTimes = getBestMeetingTimes();
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const meetingData = {
+        ...formData,
+        participants: formData.participants.split(',').map(p => p.trim()),
+      };
+      await meetingService.createMeeting(meetingData);
+      setFormData({
+        title: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        description: '',
+        participants: '',
+      });
+      loadMeetings();
+    } catch (err) {
+      setError('Failed to create meeting');
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await meetingService.deleteMeeting(id);
+      loadMeetings();
+    } catch (err) {
+      setError('Failed to delete meeting');
+      console.error(err);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleDeleteMember = async (memberId) => {
+    try {
+      await teamMemberService.deleteTeamMember(memberId);
+      setTeamMembers(prev => prev.filter(member => member._id !== memberId));
+      setError('');
+    } catch (err) {
+      setError('Failed to delete team member');
+      console.error('Error deleting team member:', err);
+    }
+  };
+
+  const renderAvailabilitySection = () => (
+    <div className="bg-white p-6 rounded-xl shadow">
+      <h2 className="text-xl font-semibold mb-4">Availability</h2>
+      
+      <div className="space-y-8">
+        {teamMembers.map(member => (
+          <div key={member._id} className="border rounded-xl p-4 shadow">
+            <h3 className="font-semibold mb-4">{member.name}</h3>
+            <div className="space-y-4">
+              {dateRange.map(date => {
+                const dateStr = date.toISOString().split('T')[0];
+                const availableSlots = getAvailableTimeSlots(member, dateStr);
+                
+                return (
+                  <div key={dateStr} className="flex flex-col md:flex-row md:items-center gap-4">
+                    <div className="w-40 font-medium">{formatDate(dateStr)}</div>
+                    <div className="flex-1">
+                      <div className="relative">
+                        <select
+                          multiple
+                          className="w-full p-2 border rounded min-h-[100px] bg-white"
+                          value={availableSlots}
+                          onChange={(e) => {
+                            const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                            timeSlots.forEach(timeSlot => {
+                              const isSelected = selectedOptions.includes(timeSlot);
+                              const isCurrentlySelected = availableSlots.includes(timeSlot);
+                              if (isSelected !== isCurrentlySelected) {
+                                toggleAvailability(member._id, dateStr, timeSlot);
+                              }
+                            });
+                          }}
+                        >
+                          {timeSlots.map(timeSlot => (
+                            <option 
+                              key={timeSlot} 
+                              value={timeSlot}
+                              className={`p-1 ${
+                                availableSlots.includes(timeSlot) 
+                                  ? 'bg-blue-100' 
+                                  : 'bg-white'
+                              }`}
+                            >
+                              {formatTimeDisplay(timeSlot)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {availableSlots.length > 0 
+                          ? `Available: ${availableSlots.map(formatTimeDisplay).join(', ')}` 
+                          : 'No availability set'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderOverlapSection = () => (
+    <div className="space-y-6">
+      {dateRange.map(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Only show dates that have at least one overlapping time slot
+        const hasOverlap = overlap[dateStr] && overlap[dateStr].some(slot => slot);
+        
+        if (!hasOverlap) return null;
+        
+        return (
+          <div key={dateStr} className="mb-2">
+            <div className="font-medium mb-2">{formatDate(dateStr)}</div>
+            <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
+              {timeSlots.map((time, timeIndex) => (
+                <div
+                  key={timeIndex}
+                  className={`text-xs p-2 rounded text-center ${
+                    overlap[dateStr] && overlap[dateStr][timeIndex] 
+                      ? "bg-green-500 text-white" 
+                      : "bg-gray-100"
+                  }`}
+                >
+                  {time}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderBestMeetingTimes = () => {
+    const bestTimes = getBestMeetingTimes();
+    
+    return (
+      <div className="bg-white p-6 rounded-xl shadow">
+        <h2 className="text-xl font-semibold mb-4">Best Meeting Times</h2>
+        {teamMembers.length === 0 ? (
+          <div className="text-center p-4 bg-gray-50 rounded">
+            Add team members to see best meeting times
+          </div>
+        ) : bestTimes.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {bestTimes.map((time, index) => (
+              <div key={index} className="border rounded-lg p-4 bg-green-50 hover:bg-green-100 transition-colors">
+                <div className="font-medium text-gray-900">{formatDate(time.date)}</div>
+                <div className="text-lg font-bold text-green-700">
+                  {formatTimeDisplay(time.startTime)} - {formatTimeDisplay(time.endTime)}
+                </div>
+                <div className="text-sm text-gray-600">
+                  Duration: {time.duration} minutes
+                </div>
+                <div className="text-sm text-green-600 mt-1">
+                  All {teamMembers.length} team members available
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-4 bg-gray-50 rounded">
+            No times found where everyone is available. Try adjusting the date range or adding more availability.
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderTeamMembersSection = () => (
+    <div className="bg-white p-6 rounded-xl shadow">
+      <h2 className="text-xl font-semibold mb-4">Team Members</h2>
+      <div className="flex items-center space-x-2 mb-4">
+        <input
+          type="text"
+          value={newMemberName}
+          onChange={(e) => setNewMemberName(e.target.value)}
+          placeholder="Add new team member"
+          className="flex-1 p-2 border rounded"
+        />
+        <button 
+          onClick={handleAddMember}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+        >
+          Add
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {teamMembers.map(member => (
+          <div key={member._id} className="border rounded-lg p-3 bg-gray-50">
+            {editingMemberId === member._id ? (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={editMemberName}
+                  onChange={(e) => setEditMemberName(e.target.value)}
+                  className="flex-1 p-1 border rounded"
+                />
+                <button 
+                  onClick={handleSaveEdit} 
+                  className="text-green-600 hover:text-green-700"
+                >
+                  Save
+                </button>
+                <button 
+                  onClick={handleCancelEdit} 
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center">
+                <div className="font-medium">{member.name}</div>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={() => handleEditMember(member._id)}
+                    className="text-blue-600 text-sm hover:text-blue-700"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteMember(member._id)}
+                    className="text-red-600 text-sm hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-4 space-y-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center">
@@ -277,53 +665,7 @@ const AdvancedMeetingPlanner = () => {
 
       {activeTab === "availability" && (
         <>
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold mb-4">Team Members</h2>
-            <div className="flex items-center space-x-2 mb-4">
-              <input
-                type="text"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="Add new team member"
-                className="flex-1 p-2 border rounded"
-              />
-              <button 
-                onClick={handleAddMember}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-              >
-                Add
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teamMembers.map(member => (
-                <div key={member.id} className="border rounded-lg p-3 bg-gray-50">
-                  {editingMemberId === member.id ? (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={editMemberName}
-                        onChange={(e) => setEditMemberName(e.target.value)}
-                        className="flex-1 p-1 border rounded"
-                      />
-                      <button onClick={handleSaveEdit} className="text-green-600">Save</button>
-                      <button onClick={handleCancelEdit} className="text-red-600">Cancel</button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center">
-                      <div className="font-medium">{member.name}</div>
-                      <button 
-                        onClick={() => handleEditMember(member.id)}
-                        className="text-blue-600 text-sm"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          {renderTeamMembersSection()}
 
           <div className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-xl font-semibold mb-4">Date Range</h2>
@@ -349,95 +691,18 @@ const AdvancedMeetingPlanner = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold mb-4">Availability</h2>
-            
-            <div className="space-y-8">
-              {teamMembers.map(member => (
-                <div key={member.id} className="border rounded-xl p-4 shadow">
-                  <h3 className="font-semibold mb-4">{member.name}</h3>
-                  <div className="space-y-6">
-                    {dateRange.map(date => {
-                      const dateStr = date.toISOString().split('T')[0];
-                      return (
-                        <div key={dateStr} className="mb-2">
-                          <div className="font-medium mb-2">{formatDate(dateStr)}</div>
-                          <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
-                            {hours.map((hour, hourIndex) => (
-                              <button
-                                key={hourIndex}
-                                className={`text-xs p-2 rounded ${
-                                  member.availability[dateStr] && member.availability[dateStr][hourIndex] 
-                                    ? "bg-blue-500 text-white" 
-                                    : "bg-gray-200"
-                                }`}
-                                onClick={() => toggleAvailability(member.id, dateStr, hourIndex)}
-                              >
-                                {hour}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {renderAvailabilitySection()}
 
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold mb-4">Team Overlap</h2>
-            <div className="space-y-6">
-              {dateRange.map(date => {
-                const dateStr = date.toISOString().split('T')[0];
-                
-                // Only show dates that have at least one overlapping time slot
-                const hasOverlap = overlap[dateStr] && overlap[dateStr].some(slot => slot);
-                
-                if (!hasOverlap) return null;
-                
-                return (
-                  <div key={dateStr} className="mb-2">
-                    <div className="font-medium mb-2">{formatDate(dateStr)}</div>
-                    <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
-                      {hours.map((hour, hourIndex) => (
-                        <div
-                          key={hourIndex}
-                          className={`text-xs p-2 rounded text-center ${
-                            overlap[dateStr] && overlap[dateStr][hourIndex] 
-                              ? "bg-green-500 text-white" 
-                              : "bg-gray-100"
-                          }`}
-                        >
-                          {hour}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold mb-4">Best Meeting Times</h2>
-            {bestMeetingTimes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {bestMeetingTimes.map((time, index) => (
-                  <div key={index} className="border rounded-lg p-4 bg-green-50">
-                    <div className="font-medium">{formatDate(time.date)}</div>
-                    <div className="text-lg font-bold">{time.hour}</div>
-                    <div className="text-sm text-gray-500">All team members available</div>
-                  </div>
-                ))}
+          {teamMembers.length > 0 && (
+            <>
+              <div className="bg-white p-6 rounded-xl shadow">
+                <h2 className="text-xl font-semibold mb-4">Team Overlap</h2>
+                {renderOverlapSection()}
               </div>
-            ) : (
-              <div className="text-center p-4 bg-gray-50 rounded">
-                No times where everyone is available. Try adjusting the date range or adding more availability.
-              </div>
-            )}
-          </div>
+              
+              {renderBestMeetingTimes()}
+            </>
+          )}
         </>
       )}
 
@@ -553,18 +818,18 @@ const AdvancedMeetingPlanner = () => {
                                   <div className="space-y-2">
                                     {teamMembers.map(member => (
                                       <div 
-                                        key={member.id}
+                                        key={member._id}
                                         className="flex items-center"
                                       >
                                         <input
                                           type="checkbox"
-                                          checked={event.votes[member.id] && event.votes[member.id][dateStr] || false}
-                                          onChange={() => toggleEventVote(event.id, member.id, dateStr)}
+                                          checked={event.votes[member._id] && event.votes[member._id][dateStr] || false}
+                                          onChange={() => toggleEventVote(event.id, member._id, dateStr)}
                                           className="mr-2"
-                                          id={`vote-${event.id}-${member.id}-${dateStr}`}
+                                          id={`vote-${event.id}-${member._id}-${dateStr}`}
                                         />
                                         <label 
-                                          htmlFor={`vote-${event.id}-${member.id}-${dateStr}`}
+                                          htmlFor={`vote-${event.id}-${member._id}-${dateStr}`}
                                           className="text-sm"
                                         >
                                           {member.name}
@@ -603,6 +868,93 @@ const AdvancedMeetingPlanner = () => {
           </div>
         </>
       )}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleInputChange}
+            placeholder="Meeting Title"
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleInputChange}
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            type="time"
+            name="startTime"
+            value={formData.startTime}
+            onChange={handleInputChange}
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            type="time"
+            name="endTime"
+            value={formData.endTime}
+            onChange={handleInputChange}
+            className="border p-2 rounded"
+            required
+          />
+          <input
+            type="text"
+            name="participants"
+            value={formData.participants}
+            onChange={handleInputChange}
+            placeholder="Participants (comma-separated)"
+            className="border p-2 rounded"
+            required
+          />
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Meeting Description"
+            className="border p-2 rounded"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        >
+          Add Meeting
+        </button>
+      </form>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {meetings.map((meeting) => (
+          <div key={meeting._id} className="border p-4 rounded shadow">
+            <h2 className="text-xl font-bold mb-2">{meeting.title}</h2>
+            <p className="text-gray-600">Date: {new Date(meeting.date).toLocaleDateString()}</p>
+            <p className="text-gray-600">Time: {meeting.startTime} - {meeting.endTime}</p>
+            <p className="text-gray-600">Description: {meeting.description}</p>
+            <p className="text-gray-600">
+              Participants: {meeting.participants.join(', ')}
+            </p>
+            <button
+              onClick={() => handleDelete(meeting._id)}
+              className="mt-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
